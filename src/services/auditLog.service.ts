@@ -26,16 +26,32 @@ import { auditLogQueueRejectionsTotal } from "../config/metrics";
  * HMAC secret loaded from environment variable.
  * In production, set AUDIT_HMAC_SECRET to a strong random value (>= 32 bytes).
  * Example: openssl rand -hex 32
+ * 
+ * SOC 2 requirement: Audit logs must use a properly configured secret to prevent tampering.
+ * Falls back to env.AUDIT_HMAC_SECRET which is validated by Zod to be >= 32 bytes when required.
  */
 function getHmacSecret(): string {
-  const secret = process.env.AUDIT_HMAC_SECRET;
-  if (!secret || secret.length < 16) {
+  // Import dynamically to avoid circular dependencies
+  const env = require("../config/env").default || {};
+  
+  const secret = env.AUDIT_HMAC_SECRET || process.env.AUDIT_HMAC_SECRET;
+  
+  // In production, enforce the secret is set and strong
+  if (process.env.NODE_ENV === "production" && (!secret || secret.length < 32)) {
+    throw new Error(
+      "AUDIT_HMAC_SECRET is required in production and must be at least 32 bytes. " +
+      "Generate with: openssl rand -hex 32. This is a SOC 2 Type II requirement."
+    );
+  }
+  
+  if (!secret || secret.length < 32) {
     logger.warn(
       "AUDIT_HMAC_SECRET is not set or too short — using insecure default. " +
-        "Set a strong AUDIT_HMAC_SECRET in production for SOC 2 compliance.",
+      "In production, set a strong AUDIT_HMAC_SECRET (>= 32 bytes) for SOC 2 compliance.",
     );
     return "insecure-default-audit-hmac-secret-change-me";
   }
+  
   return secret;
 }
 

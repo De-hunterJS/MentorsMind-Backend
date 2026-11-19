@@ -11,6 +11,54 @@ export interface AuditLogConfig {
 }
 
 /**
+ * Sanitized query/params list to prevent logging sensitive data.
+ * Routes that accept credentials as query parameters must sanitize
+ * before including them in audit logs to prevent storing tokens/keys.
+ */
+const SENSITIVE_PARAM_NAMES = [
+    'token', 'accessToken', 'access_token',
+    'refreshToken', 'refresh_token',
+    'apiKey', 'api_key', 'key',
+    'secret', 'password', 'passwd',
+    'credential', 'credentials',
+    'authorization', 'auth',
+    'bearer', 'jwt',
+    'session', 'sessionId',
+];
+
+/**
+ * Removes sensitive parameters from an object to prevent audit log exposure.
+ * Searches keys recursively (case-insensitive partial match).
+ */
+function sanitizeParams(obj: Record<string, any> | undefined): Record<string, any> {
+    if (!obj || typeof obj !== 'object') return obj || {};
+
+    const sanitized: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        const keyLower = key.toLowerCase();
+        const isSensitive = SENSITIVE_PARAM_NAMES.some(
+            sensitive => keyLower.includes(sensitive.toLowerCase())
+        );
+
+        if (isSensitive) {
+            sanitized[key] = '[REDACTED]';
+        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+            sanitized[key] = sanitizeParams(value);
+        } else if (Array.isArray(value)) {
+            sanitized[key] = value.map(item =>
+                typeof item === 'object' && item !== null
+                    ? sanitizeParams(item)
+                    : item
+            );
+        } else {
+            sanitized[key] = value;
+        }
+    }
+
+    return sanitized;
+}
+
+/**
  * Higher-order middleware function to log audit events automatically.
  * 
  * Example usage:
@@ -46,8 +94,8 @@ export const auditLogMiddleware = (config: AuditLogConfig) => {
                         ...metadata,
                         method: req.method,
                         path: req.originalUrl,
-                        params: req.params,
-                        query: req.query,
+                        params: sanitizeParams(req.params),
+                        query: sanitizeParams(req.query),
                         statusCode: res.statusCode,
                     },
                     ipAddress: extractClientIp(req),

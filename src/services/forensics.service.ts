@@ -26,6 +26,7 @@ import {
   type IncidentEvidence,
 } from "../models/security-incident.model";
 import { StorageService } from "./storage.service";
+import { default as env } from "../config/env";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -99,7 +100,13 @@ export interface ForensicBundle {
 // ─── Evidence hashing helpers ─────────────────────────────────────────────────
 
 function computeEvidenceHash(content: Record<string, unknown>): string {
-  const secret = process.env.AUDIT_HMAC_SECRET ?? "insecure-default-change-me";
+  // Use validated env object to get AUDIT_HMAC_SECRET with proper error handling
+  const secret = env.AUDIT_HMAC_SECRET || process.env.AUDIT_HMAC_SECRET || "insecure-default-change-me";
+  
+  if ((!secret || secret.length < 32) && process.env.NODE_ENV === "production") {
+    logger.error("computeEvidenceHash: AUDIT_HMAC_SECRET is not properly configured. Forensic integrity check failed.");
+  }
+  
   const canonical = JSON.stringify(content, Object.keys(content).sort());
   return crypto
     .createHmac("sha256", secret)

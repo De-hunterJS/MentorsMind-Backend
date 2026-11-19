@@ -87,6 +87,18 @@ export const createSlowDown = (options: {
   });
 };
 
+// ─────────────────────────────────────────────────────────────────────────
+// PRE-INITIALIZED RATE LIMITERS (created once at module load time)
+// 
+// Each of these is created ONCE when the middleware module is imported, not
+// per-request. The underlying express-rate-limit store accumulates hits
+// across requests within the configured time window.
+//
+// ⚠️  CRITICAL: These must NEVER be recreated inside a middleware function
+// or handler, as doing so creates a new store with reset counters for each
+// request, effectively disabling the rate limit.
+// ─────────────────────────────────────────────────────────────────────────
+
 // General API rate limiting
 export const generalRateLimit = createRateLimit({
   windowMs: validationConfig.rateLimiting.general.windowMs,

@@ -233,6 +233,13 @@ export const envSchema = z.object({
   ENCRYPTION_KEY: z
     .string()
     .min(64, "ENCRYPTION_KEY must be at least 64 characters"), // Increased from 32
+  /** HMAC secret for audit log tamper detection (SOC 2 requirement).
+   *  Must be at least 32 bytes (64 hex chars). Generate with: openssl rand -hex 32
+   */
+  AUDIT_HMAC_SECRET: z
+    .string()
+    .min(32, "AUDIT_HMAC_SECRET must be at least 32 bytes for SOC 2 compliance")
+    .optional(),
   MFA_TOTP_ISSUER: z.string().default("MentorMinds"),
 
   // WebAuthn / FIDO2

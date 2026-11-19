@@ -12,14 +12,26 @@ import * as crypto from "crypto";
 import pool from "../config/database";
 import { Logger, logger } from "../utils/logger.utils";
 import { TenantContext } from "../utils/tenant-context.utils";
+import { default as env } from "../config/env";
 
 // â”€â”€ Hash helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getHmacSecret(): string {
-  const secret = process.env.AUDIT_HMAC_SECRET;
-  if (!secret || secret.length < 16) {
+  const secret = env.AUDIT_HMAC_SECRET || process.env.AUDIT_HMAC_SECRET;
+  
+  // In production, enforce the secret is set and strong
+  if (process.env.NODE_ENV === "production" && (!secret || secret.length < 32)) {
+    throw new Error(
+      "AUDIT_HMAC_SECRET is required in production and must be at least 32 bytes. " +
+      "This is a SOC 2 Type II requirement for audit log integrity."
+    );
+  }
+  
+  if (!secret || secret.length < 32) {
+    logger.warn("getHmacSecret: AUDIT_HMAC_SECRET is not properly configured for production security.");
     return "insecure-default-audit-hmac-secret-change-me";
   }
+  
   return secret;
 }
 

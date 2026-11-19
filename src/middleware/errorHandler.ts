@@ -12,6 +12,8 @@ import {
 } from "../errors/error-codes";
 import i18next, { detectLanguage } from "../config/i18n.config";
 import { TenantContext } from "../utils/tenant-context.utils";
+import { default as env } from "../config/env";
+
 
 export interface AppError extends Error {
   code?: ErrorCode;
@@ -210,6 +212,10 @@ export const errorHandler = (
   const catalogEntry = getCatalogEntry(resolveErrorCode(err, statusCode));
   const details = "details" in err ? (err as AppError).details : undefined;
 
+  // Only include stack traces in development — use validated env object, not raw process.env
+  // to prevent inconsistency issues with NODE_ENV configuration
+  const isDevelopment = env.NODE_ENV === "development";
+
   const body: ErrorResponse = {
     status: "error",
     code: catalogEntry.code,
@@ -217,7 +223,7 @@ export const errorHandler = (
     ...(details !== undefined && { details }),
     requestId,
     timestamp: new Date().toISOString(),
-    ...(process.env.NODE_ENV === "development" && {
+    ...(isDevelopment && {
       stack: err.stack,
       path: req.path,
     }),
